@@ -1,0 +1,168 @@
+---
+title: "Analysis of Categorical Data Project 1"
+author: "Maya Elshweikhy"
+output:
+  word_document: default
+  pdf_document: default
+---
+## Installing packages
+```{r}
+library(tinytex)
+library(carData)
+library(magrittr)
+library(dplyr)
+library(MASS)
+library(pscl)
+library(car)
+library(ROCR)
+library(ggplot2)
+```
+## Reading Loan Data Set 
+```{r}
+# reading the data 
+x<-read.csv('Loan_Data.csv', header = TRUE)
+head(x)
+# Check for missing values
+sum(is.na(x)) 
+# Remove missing values 
+x <- na.omit(x)
+
+```
+
+```{r}
+x <- x[x$Gender != "", ]
+x <- x[x$Married != "", ]
+x <- x[x$Dependents != "", ]
+x <- x[x$Education != "", ]
+x <- x[x$Self_Employed != "", ]
+x <- x[x$Property_Area != "", ]
+x <- x[x$Loan_Status != "", ]
+x$Loan_Status <- ifelse(x$Loan_Status == "Y", 1, 0)
+
+x$Gender <- as.factor(x$Gender)
+x$Married <- as.factor(x$Married)
+x$Dependents <- as.factor(x$Dependents)
+x$Education <- as.factor(x$Education)
+x$Self_Employed <- as.factor(x$Self_Employed)
+x$Property_Area <- as.factor(x$Property_Area)
+x$Credit_History <- as.factor(x$Credit_History)
+prop.table(table(x$Loan_Status))
+
+```
+
+## Checking for Multicollinearity
+Fitting a Logistic Regression Model and Checking for Multicollinearity 
+```{r}
+fit1 <- glm(factor(x$Loan_Status) ~
+            factor(x$Gender) + factor(x$Married) + factor(x$Dependents) + 
+            factor(x$Education) + factor(x$Self_Employed) + x$ApplicantIncome + 
+            x$CoapplicantIncome + x$LoanAmount + x$Loan_Amount_Term + 
+            factor(x$Credit_History) + factor(x$Property_Area),
+            family = binomial, data = x)
+vif(fit1)
+
+```
+
+As shown in the R output, all VIF values are less than 10, therefore there is no multicollinearity indicatig that there are no correlated variables.  
+
+## 1. Use the step() function to find the best logistic model without any interaction terms and write the model equation.
+
+```{r}
+fit2=step(fit1, test="Chisq")
+```
+
+**Based on the output we will fit the best model**
+
+```{r}
+best_model<-glm(factor(x$Loan_Status)~factor(x$Married)+factor(x$Credit_History)+factor(x$Property_Area)+x$LoanAmount, family = binomial, data = x)
+summary(best_model)
+```
+
+**Model Equation**
+
+Log (π/1-π) =-2.696180+0.667373 Married (yes) + 3.617154 CreditHistory (1) + 0.938358 PropertyArea (Semiurban) + 0.147326 Property Area (Urban) - 0.002474 LoanAmount
+
+## 2. Run all model diagnostics and comment on them.
+
+1) Checking for Linearity
+
+
+```{r}
+pred=predict(best_model, type = "link")
+p<-ggplot(data = data.frame(LoanAmount= x$LoanAmount, pred = pred),
+aes(LoanAmount, pred)) +
+geom_point(size = 0.5, alpha = 0.5) +
+geom_smooth(method = "lowess") + theme_bw()
+p
+```
+
+As shown in the R output, from the graph we can see that there a linear between the Loan Amount and the log of the odds ratio. 
+
+2) Checking for Influential Points
+
+```{r}
+par(mfrow=c(1,2))
+plot(best_model, which=4)
+plot(best_model, which=5)
+```
+
+As shown in the R output,there are influential points in the data. To illustrate, from Cook's distance graph, there are three points identified as influential points  which are observations 156, 327, and 454 respectively. From the Residuals vs. Leverage plot, we can see that we have outliers in x and in y. The points that are considered high residuals are observations  32, 454, and 156 and these points are also outliers in y. There are about five points that considered high leverage on the right and these points are outliers in x. 
+
+## 3. After reaching the best model in (1), include the interaction term between Married and Gender to your best model and interpret its coefficients.
+
+```{r}
+interaction.plot(x$Married, x$Gender, x$Loan_Status,
+main = "Interaction Plot between Gender and Married based on Loan
+Status",
+xlab = "Married", ylab = "Mean of Loan Status", legend =
+TRUE)
+```
+
+Fitting the model with interaction term
+```{r}
+
+fit3=glm(Loan_Status ~ factor(Gender)*factor(Married)+factor(Credit_History)+factor(Property_Area)+LoanAmount, family = binomial,data = x)
+summary(fit3)
+```
+
+**Interpretation of Interaction term coefficient**
+The difference between the log-odds ratio comparing males vs females who are married and the log-odds ratio comparing males vs. females who are not married is 0.240438, holding all other variables constant.
+
+## 4. Use the best model you reach whether with or without the interaction term to
+
+(a) find the confusion matrix at a threshold of 0.5.
+```{r}
+predict_1=predict(best_model, type="response")
+table(best_model$y)
+```
+
+(b) draw the ROC curves for the two models, compare them and interpret them.
+
+```{r}
+pred1 = predict(best_model, type = "response")
+pred2 = predict(fit3, type = "response")
+rocr.pred1 = prediction(pred1, labels =x$Loan_Status)
+rocr.pred2 = prediction(pred2, labels =x$Loan_Status) #ROCR prediction object
+roc.perf1 = performance(rocr.pred1, measure = "tpr", x.measure = "fpr")
+roc.perf2 = performance(rocr.pred2, measure = "tpr", x.measure = "fpr") #ROCR performance object
+plot(roc.perf1, col = "red")
+abline(a = 0, b = 1, lty = 2)
+par(new=TRUE)
+plot(roc.perf2, col = "skyblue")
+abline(a = 0, b = 1, lty = 2) #diagonal corresponding to a random assignment
+legend("bottomright", leg = c("best","best with interaction"), col =c("red","skyblue"), lwd = 1.5)
+```
+
+From the  ROC plot,  we can see that both curves are almost similar as they have the same shape. We can see that the best model with interaction term is better than the best model. The aim is to hae more values at the  upper right so our model would have high TPR and Low FPR and sccorddigly our model correctly predit.  
+
+
+(c) what is the approximate optimum threshold to determine the loan
+eligibility using the better model.
+
+```{r}
+plot(performance(rocr.pred2, measure = "err"), col = "red")
+abline(h = 0.2, lty = 2)
+```
+
+The approximate optimum threshold to determine the loan eligibility using the better model is approximatly 0.6 and this is the cut off point in which reach the minimum error rate.  
+

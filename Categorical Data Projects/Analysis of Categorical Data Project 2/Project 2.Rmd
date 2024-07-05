@@ -1,0 +1,235 @@
+---
+title: "Categorical Project 2"
+author: "Maya Elshweikhy"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+## Installing packages
+```{r}
+library(tinytex)
+library(carData)
+library(dplyr)
+library(MASS)
+library(pscl)
+library(ggplot2)
+library(mlogit)
+```
+
+# Loading the Heating data from the mlogit package
+```{r}
+data("Heating", package = "mlogit")
+str(Heating)
+```
+# Question 1
+
+```{r}
+# Prepare the data for mlogit
+Heating_mlogit <- mlogit.data(Heating, choice = "depvar", shape = "wide", 
+                              varying = c(3:12))
+
+# Run the multinomial logit model with installation cost and operating cost
+model1 <- mlogit(depvar ~ ic + oc, data = Heating_mlogit)
+
+summary(model1)
+```
+**Interpretation**
+As shown in the R output, the Frequencies of alternatives outputs the prorportion of each heating system choice in which ec (electric central) represents 7.1%, er (electric room) represents 9.3%, gc (gas central) represents 63.7%, gr (gas room) represents 14.3%, and hp (heat pump)represents 5.6%.The model took 6 iterations to converge with 9.58E-06 convergence criterion.
+
+**Coefficients**
+The coefficients for each alternative (relative to the base category, ec by default) are provided along with their standard errors, z-values, and p-values:
+
+**Intercepts:**
+
+er: 0.195 (not significant, p = 0.341)
+gc: 0.052 (not significant, p = 0.911)
+gr: -1.351 (significant, p = 0.008)
+hp: -1.659 (significant, p < 0.001)
+
+**Variables:**
+
+ic (installation cost): -0.00153 (significant, p = 0.014)
+oc (operating cost): -0.00700 (highly significant, p < 0.001)
+
+**Model Fit**
+
+**Log-Likelihood**: -1008.2
+**McFadden R^2**: 0.013691, indicating that the proportion of the variance explained by the model is relatively low.
+**Likelihood Ratio Test:**
+Chi-squared statistic = 27.99
+p-value = 8.3572e-07, indicating that the model is statistically significant.
+
+
+```{r}
+# Fit the model with only the operating cost
+model2 <- mlogit(depvar ~ oc, data = Heating_mlogit)
+summary(model2)
+```
+```{r}
+# Comparing models using AIC
+AIC(model1)
+AIC(model2)
+
+# Perform likelihood ratio test between two models
+lrtest(model1, model2)
+```
+
+**Interpretation**
+
+Log-Likelihood
+Model 1: -1008.2
+Model 2: -1011.3
+Model 1 has a higher log-likelihood so it has a better fit.
+
+McFadden's R-squared
+Model 1: 0.013691
+Model 2: 0.010696
+Model 1 accounts for a slightly higher proportion of the variance in the outcome variable compared to Model 2.
+
+Likelihood Ratio Test
+To formally compare the models, we use the likelihood ratio test results:
+
+Chi-squared statistic: 6.1223
+Degrees of freedom: 1 (difference in the number of parameters between the two models)
+p-value: 0.01335
+We reject the null hypothesis since the p-value is less than alpha (0.05) in which Model 2  is sufficient. we cann conclude that Model 1 provides a significantly better fit.
+
+Considering the log-likelihood, McFadden's R-squared, and the likelihood ratio test, Model 1, integrating both installation cost (ic) and operating cost (oc), exhibits a superior fit to the dataset compared to Model 2,which includes only the operating cost (oc). The additionn of oc  enhances  the model. 
+
+```{r}
+# Fit the null model
+null_model <- mlogit(depvar ~ 1, data = Heating_mlogit)
+
+# Perform likelihood ratio test between two models
+lrtest(model1, null_model)
+
+```
+**Interpretation**
+
+Degrees of Freedom (Df):
+
+Model 1: 6
+Model 2: 4
+Difference in degrees of freedom: 6 - 4 = 2
+Log-Likelihood (LogLik):
+
+Model 1: -1008.2
+Model 2: -1022.2
+Chi-Squared Statistic (Chisq) = 2 × (LogLik of Model 1 - LogLik of Model 2) = 2 × (-1008.2 - (-1022.2)) = 27.99
+
+P-Value (Pr(>Chisq)):
+
+The p-value for the likelihood ratio test is 8.357 × 10^-7, which is very small.
+
+Significance: Since the p-value (8.357 × 10^-7) is very small , so we reject the null hypothesis that the model with only the intercepts (Model 2) is sufficient. Therefore, the chosen model (Model 1) with both ic and oc is statistically significant and provides a significantly better fit to the data.
+
+```{r}
+# checking coefficient significance for model 1 
+summary(model1)
+
+```
+**Interpretation**
+(Intercept):er
+
+Estimate: 0.19459102
+Std. Error: 0.20424212
+z-value: 0.9527
+Pr(>|z|): 0.3407184
+Interpretation: The intercept for electric room (er) heating systems shows no statistical significance (p-value > 0.05).
+
+(Intercept):gc
+
+Estimate: 0.05213336
+Std. Error: 0.46598878
+z-value: 0.1119
+Pr(>|z|): 0.9109210
+Interpretation: The intercept for gas central (gc) heating systems also lacks statistical significance (p-value > 0.05).
+
+(Intercept):gr
+
+Estimate: -1.35058266
+Std. Error: 0.50715442
+z-value: -2.6631
+Pr(>|z|): 0.0077434 **
+Interpretation: The intercept for gas room (gr) heating systems is statistically significant (p-value < 0.01).
+
+(Intercept):hp
+
+Estimate: -1.65884594
+Std. Error: 0.44841936
+z-value: -3.6993
+Pr(>|z|): 0.0002162 ***
+Interpretation: The intercept for heat pump (hp) heating systems is highly significant (p-value < 0.001).
+
+ic (Installation Cost)
+
+Estimate: -0.00153315
+Std. Error: 0.00062086
+z-value: -2.4694
+Pr(>|z|): 0.0135333 *
+Interpretation: The installation cost is statistically significant (p-value < 0.05). The negative coefficient suggests that higher installation costs decrease the likelihood of choosing a particular heating system.
+
+oc (Operating Cost)
+
+Estimate: -0.00699637
+Std. Error: 0.00155408
+z-value: -4.5019
+Pr(>|z|): 6.734e-06 ***
+Interpretation: The operating cost is highly significant (p-value < 0.001). The negative coefficient suggests that higher operating costs decrease the likelihood of choosing a particular heating system.
+
+Conclusion:
+
+For Statistical Significance, both installation cost (ic) and operating cost (oc) are significant predictors of the choice of heating system.
+
+Intercepts:the intercepts for gas room (gr) and heat pump (hp) heating systems are the only ones statistically significant, indicating that baseline levels are different from reference category
+
+## Question 2
+
+```{r}
+# Load the data
+setwd("~/Desktop/Spring 2024/Categorical Data/Project 2")
+data <- read.csv("insurance.csv")
+str(data)
+```
+
+```{r}
+data$risk_factor <- factor(data$risk_factor, ordered = TRUE)
+model3 <- data[, c("risk_factor", "car_age", "car_value")]
+
+# Remove missing values
+model3 <- na.omit(model3)
+
+# Fit the ordinal logistic regression model
+model <- polr(risk_factor ~ car_age + car_value, data = model3, method = "logistic")
+# Example of model summary output
+summary(model)
+
+```
+**Interpretation**
+
+Coefficients:
+
+car_age: The coefficient for car_age is 0.02637 with a standard error of 0.0005263. This suggests that for each one-unit increase in car_age, the log odds of being in a higher risk factor category increase by 0.02637 units.
+
+car_value (Categories a to i): These coefficients reflect the impact of each level of car_value relative to a baseline level (let's denote it as car_value level z).This implies that compared to car_value level z, being in car_valuea reduces the log odds of being in a higher risk factor category by 1.26734 units.
+
+Intercepts: 1|2, 2|3, 3|4: These intercepts denote the thresholds between  risk factor categories.  the intercept for 1|2 is -1.6256. This indicates that the log odds of being in risk factor category 1 versus category 2 are -1.6256 when the predictors which are car_age and car_value are zero.
+
+Residual Deviance and AIC:
+
+Residual Deviance: It measures how effectively the model fits the data. Lower values signify better fit.
+
+AIC (Akaike Information Criterion): It measures the model's goodness of fit while considering the number of parameters. Smaller values suggest better fit.
+
+
+The model effectively captures the relationship between the predictors  and the ordinal response variable . The coefficients give insights into how alterations in the predictors influence the log odds of being in higher risk factor categories.
+
+
+
+
+
+
+
+
